@@ -1,0 +1,43 @@
+---
+# list all errata on hosts registered to Red Hat Satellite
+- hosts: all
+
+  vars:
+
+    satellite_fqdn: satellite.local
+    satellite_port: 443
+    satellite_user: admin
+    satellite_password: changeme
+
+  tasks:
+
+    - name: "Get host data on {{ satellite_fqdn }}"
+      ansible.builtin.uri:
+        url: https://{{ satellite_fqdn }}:{{ satellite_port }}/api/v2/hosts
+        user: "{{ satellite_user }}"
+        password: "{{ satellite_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: satellite_hosts
+
+    - name: Set host IDs
+      ansible.builtin.set_fact:
+        host_ids:
+          "{{ (satellite_hosts['json']['results'] | map(attribute='id')) | zip(satellite_hosts['json']['results'] | map(attribute='name')) | list }}"
+
+    - name: Get host errata information
+      ansible.builtin.uri:
+        url: https://{{ satellite_fqdn }}:{{ satellite_port }}/api/v2/hosts/{{ item[0] }}/errata
+        user: "{{ satellite_user }}"
+        password: "{{ satellite_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: satellite_errata
+      loop: "{{ host_ids }}"
+
+    - name: Show host errata
+      ansible.builtin.debug:
+        msg: "{{ item['json']['results'] | map(attribute='uuid') }}"
+      loop: "{{ satellite_errata['results'] }}"
+      loop_control:
+        label: "{{ item['item'] }}"

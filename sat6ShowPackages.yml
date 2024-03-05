@@ -1,0 +1,54 @@
+---
+# list all packages installed on hosts registered to Red Hat Satellite
+- hosts: all
+
+  vars:
+
+    satellite_fqdn: satellite.local
+    satellite_port: 443
+    satellite_user: admin
+    satellite_password: changeme
+
+  tasks:
+
+    - name: "Get host data on {{ satellite_fqdn }}"
+      ansible.builtin.uri:
+        url: https://{{ satellite_fqdn }}:{{ satellite_port }}/api/v2/hosts
+        user: "{{ satellite_user }}"
+        password: "{{ satellite_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: satellite_hosts
+
+    - name: Set host IDs
+      ansible.builtin.set_fact:
+        host_ids:
+          "{{ (satellite_hosts['json']['results'] | map(attribute='id')) | zip(satellite_hosts['json']['results'] | map(attribute='name')) | list }}"
+
+    - name: Show hostnames
+      ansible.builtin.debug:
+        msg: "{{ satellite_hosts['json']['results'] | map(attribute='name') }}"
+
+    - name: Show host OS
+      ansible.builtin.debug:
+        msg: "{{ item['name'] }}: {{ item['operatingsystem_name'] }}"
+      loop: "{{ satellite_hosts['json']['results'] }}"
+      loop_control:
+        label: "{{ item['name'] }}"
+
+    - name: Get host package information
+      ansible.builtin.uri:
+        url: https://{{ satellite_fqdn }}:{{ satellite_port }}/api/v2/hosts/{{ item[0] }}/packages?full_result=true
+        user: "{{ satellite_user }}"
+        password: "{{ satellite_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: satellite_packages
+      loop: "{{ host_ids }}"
+
+    - name: Show host packages
+      ansible.builtin.debug:
+        msg: "{{ item['json']['results'] | map(attribute='nvrea') }}"
+      loop: "{{ satellite_packages['results'] }}"
+      loop_control:
+        label: "{{ item['item'] }}"
