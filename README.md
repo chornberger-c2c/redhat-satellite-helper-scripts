@@ -1,0 +1,1 @@
+# redhat-satellite-helper-scripts
